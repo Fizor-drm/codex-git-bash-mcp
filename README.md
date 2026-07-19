@@ -1,5 +1,7 @@
 # Codex Git Bash MCP
 
+English | [日本語](README.ja.md)
+
 A Codex plugin that runs Windows development commands through Git for Windows Bash.
 
 ## What it provides
