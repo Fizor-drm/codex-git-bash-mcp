@@ -12,7 +12,9 @@ Set `GIT_BASH_PATH` before starting Codex to override the Git Bash executable lo
 
 ## Tool
 
-`git_bash_exec` accepts a command and an existing absolute Windows working directory. It returns `exitCode`, `signal`, `stdout`, `stderr`, and `timedOut`. Commands default to a 120-second timeout and retain at most 1 MiB each of stdout and stderr.
+`git_bash_exec` accepts a command and an existing absolute Windows working directory. It defaults to `output_mode: compact`, retaining up to 32 KiB each of stdout and stderr while preserving both the beginning and end when truncated. Use `output_mode: full` for a 1 MiB default only when more diagnostic context is needed. An explicit `max_output_bytes` overrides either limit.
+
+Successful responses contain only useful command output (or a short completion message). Failed responses include exit details, stderr, and stdout. Logs are returned once rather than duplicated in structured metadata, reducing token usage without hiding failure diagnostics.
 
 This tool can execute arbitrary commands with the permissions of the Codex process. Continue to apply Codex approval, sandbox, and destructive-action rules. The runtime server uses only Node.js built-ins and has no runtime npm dependencies.
 

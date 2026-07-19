@@ -55,3 +55,21 @@ test("terminates commands that exceed the timeout", async () => {
   assert.notEqual(result.exitCode, 0);
   assert.ok(Date.now() - startedAt < 1_000, "the process tree should terminate promptly");
 });
+
+test("preserves the beginning and end when output is truncated", async () => {
+  const { runGitBash } = await loadRunner();
+
+  const result = await runGitBash({
+    command: "printf 'A%.0s' {1..800}; printf 'MIDDLE'; printf 'Z%.0s' {1..800}",
+    maxOutputBytes: 1_024,
+    bashPath,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stdoutTruncated, true);
+  assert.equal(result.stderrTruncated, false);
+  assert.match(result.stdout, /^A+/);
+  assert.match(result.stdout, /\[output truncated\]/);
+  assert.match(result.stdout, /Z+$/);
+  assert.ok(Buffer.byteLength(result.stdout, "utf8") <= 1_024);
+});

@@ -3,10 +3,11 @@ import readline from "node:readline";
 import {
   DEFAULT_MAX_OUTPUT_BYTES,
   DEFAULT_TIMEOUT_MS,
+  FULL_MAX_OUTPUT_BYTES,
   runGitBash,
 } from "./runner.mjs";
 
-const SERVER_INFO = { name: "git-bash-executor", version: "0.1.0" };
+const SERVER_INFO = { name: "git-bash-executor", version: "0.2.0" };
 const PROTOCOL_VERSION = "2025-06-18";
 
 const tool = {
@@ -39,18 +40,32 @@ const tool = {
         default: DEFAULT_MAX_OUTPUT_BYTES,
         description: "Maximum bytes retained separately for stdout and stderr",
       },
+      output_mode: {
+        type: "string",
+        enum: ["compact", "full"],
+        default: "compact",
+        description: "Compact uses a 32 KiB default limit; full uses a 1 MiB default limit",
+      },
     },
   },
   outputSchema: {
     type: "object",
     additionalProperties: false,
-    required: ["exitCode", "signal", "stdout", "stderr", "timedOut"],
+    required: [
+      "exitCode",
+      "signal",
+      "timedOut",
+      "stdoutTruncated",
+      "stderrTruncated",
+      "outputMode",
+    ],
     properties: {
       exitCode: { type: "integer" },
       signal: { type: ["string", "null"] },
-      stdout: { type: "string" },
-      stderr: { type: "string" },
       timedOut: { type: "boolean" },
+      stdoutTruncated: { type: "boolean" },
+      stderrTruncated: { type: "boolean" },
+      outputMode: { type: "string", enum: ["compact", "full"] },
     },
   },
 };
@@ -78,8 +93,14 @@ function validateArguments(args) {
     throw new TypeError("cwd must be an existing absolute Windows directory");
   }
 
+  const outputMode = args.output_mode ?? "compact";
+  if (outputMode !== "compact" && outputMode !== "full") {
+    throw new TypeError("output_mode must be compact or full");
+  }
   const timeoutMs = args.timeout_ms ?? DEFAULT_TIMEOUT_MS;
-  const maxOutputBytes = args.max_output_bytes ?? DEFAULT_MAX_OUTPUT_BYTES;
+  const maxOutputBytes =
+    args.max_output_bytes ??
+    (outputMode === "full" ? FULL_MAX_OUTPUT_BYTES : DEFAULT_MAX_OUTPUT_BYTES);
   if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 600_000) {
     throw new TypeError("timeout_ms must be an integer between 100 and 600000");
   }
@@ -87,7 +108,33 @@ function validateArguments(args) {
     throw new TypeError("max_output_bytes must be an integer between 1024 and 10485760");
   }
 
-  return { command: args.command, cwd: args.cwd, timeoutMs, maxOutputBytes };
+  return { command: args.command, cwd: args.cwd, timeoutMs, maxOutputBytes, outputMode };
+}
+
+function metadata(result, outputMode) {
+  return {
+    exitCode: result.exitCode,
+    signal: result.signal,
+    timedOut: result.timedOut,
+    stdoutTruncated: result.stdoutTruncated,
+    stderrTruncated: result.stderrTruncated,
+    outputMode,
+  };
+}
+
+function formatResult(result) {
+  if (result.exitCode === 0 && !result.timedOut) {
+    const parts = [];
+    if (result.stdout) parts.push(result.stdout);
+    if (result.stderr) parts.push(`stderr:\n${result.stderr}`);
+    return parts.join("\n") || "Command completed successfully.";
+  }
+
+  const parts = [`exitCode: ${result.exitCode}`, `timedOut: ${result.timedOut}`];
+  if (result.signal) parts.push(`signal: ${result.signal}`);
+  if (result.stderr) parts.push(`stderr:\n${result.stderr}`);
+  if (result.stdout) parts.push(`stdout:\n${result.stdout}`);
+  return parts.join("\n");
 }
 
 async function handleRequest(message) {
@@ -115,10 +162,11 @@ async function handleRequest(message) {
       return;
     }
     try {
-      const result = await runGitBash(validateArguments(params.arguments));
+      const validated = validateArguments(params.arguments);
+      const result = await runGitBash(validated);
       sendResult(id, {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-        structuredContent: result,
+        content: [{ type: "text", text: formatResult(result) }],
+        structuredContent: metadata(result, validated.outputMode),
         isError: result.exitCode !== 0,
       });
     } catch (error) {

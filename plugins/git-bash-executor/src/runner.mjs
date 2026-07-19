@@ -4,28 +4,35 @@ import path from "node:path";
 
 export const DEFAULT_BASH_PATH = "C:\\Program Files\\Git\\bin\\bash.exe";
 export const DEFAULT_TIMEOUT_MS = 120_000;
-export const DEFAULT_MAX_OUTPUT_BYTES = 1_048_576;
+export const DEFAULT_MAX_OUTPUT_BYTES = 32_768;
+export const FULL_MAX_OUTPUT_BYTES = 1_048_576;
 
 function collectBounded(stream, maxBytes) {
-  const chunks = [];
-  let size = 0;
-  let truncated = false;
+  const marker = Buffer.from("\n[output truncated]\n");
+  const tailLimit = Math.floor((maxBytes - marker.length) / 2);
+  const headLimit = maxBytes - marker.length - tailLimit;
+  const initialChunks = [];
+  let initialSize = 0;
+  let tail = Buffer.alloc(0);
+  let totalSize = 0;
 
   stream.on("data", (chunk) => {
-    if (size >= maxBytes) {
-      truncated = true;
-      return;
+    totalSize += chunk.length;
+    if (initialSize < maxBytes) {
+      const accepted = chunk.subarray(0, maxBytes - initialSize);
+      initialChunks.push(accepted);
+      initialSize += accepted.length;
     }
-    const remaining = maxBytes - size;
-    const accepted = chunk.subarray(0, remaining);
-    chunks.push(accepted);
-    size += accepted.length;
-    if (accepted.length < chunk.length) truncated = true;
+    tail = Buffer.concat([tail, chunk]).subarray(-tailLimit);
   });
 
   return () => {
-    const text = Buffer.concat(chunks).toString("utf8");
-    return truncated ? `${text}\n[output truncated]` : text;
+    const initial = Buffer.concat(initialChunks);
+    if (totalSize <= maxBytes) {
+      return { text: initial.toString("utf8"), truncated: false };
+    }
+    const bounded = Buffer.concat([initial.subarray(0, headLimit), marker, tail]);
+    return { text: bounded.toString("utf8"), truncated: true };
   };
 }
 
@@ -80,11 +87,15 @@ export async function runGitBash({
     });
     child.once("close", (code, signal) => {
       clearTimeout(fallbackTimer);
+      const stdout = readStdout();
+      const stderr = readStderr();
       resolve({
         exitCode: code ?? -1,
         signal,
-        stdout: readStdout(),
-        stderr: readStderr(),
+        stdout: stdout.text,
+        stderr: stderr.text,
+        stdoutTruncated: stdout.truncated,
+        stderrTruncated: stderr.truncated,
         timedOut: code === 124,
       });
     });

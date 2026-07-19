@@ -5,22 +5,24 @@ description: Use for development commands on Windows when Git Bash Executor is i
 
 # Use Git Bash
 
-Use the `git_bash_exec` MCP tool for development shell commands on Windows.
+Run Windows development shell commands with the `git_bash_exec` MCP tool.
 
 ## Required behavior
 
-- Use `git_bash_exec` for Git, `rg`, builds, tests, package managers, scripts, and POSIX shell operations.
-- Always pass the active workspace as an absolute Windows path in `cwd`.
-- Keep each command scoped to the user's task and follow all existing approval and destructive-action rules.
-- Use native file-editing tools such as `apply_patch` for manual edits; this skill changes command execution, not editing policy.
-- Use PowerShell only for Windows-specific administration that Git Bash cannot perform, or when the MCP tool is unavailable.
-- If the MCP tool fails, report the failure before falling back to another shell for a materially different or privileged operation.
+- Use it for Git, `rg`, builds, tests, package managers, scripts, and POSIX commands.
+- Pass the active workspace as an absolute Windows `cwd`.
+- Keep commands scoped and follow existing approval and destructive-action rules.
+- Continue using native editing tools such as `apply_patch` for manual edits.
+- Use the default `compact` output mode. Retry with `output_mode: full` only when truncated or missing output prevents diagnosis.
+- Use PowerShell only for Windows administration Git Bash cannot perform, or when the tool is unavailable.
+- Report MCP failure before using another shell for a materially different or privileged operation.
 
 ## Tool arguments
 
 - `command`: the Git Bash command.
 - `cwd`: an existing absolute Windows directory.
-- `timeout_ms`: optional, from 100 to 600000; default 120000.
-- `max_output_bytes`: optional, from 1024 to 10485760; default 1048576.
+- `timeout_ms`: optional, 100 to 600000; default 120000.
+- `output_mode`: optional, `compact` (default, 32 KiB) or `full` (1 MiB).
+- `max_output_bytes`: optional explicit limit, 1024 to 10485760.
 
-Treat a non-zero `exitCode` or `timedOut: true` as a failed command and inspect both `stdout` and `stderr`.
+Treat a non-zero `exitCode` or `timedOut: true` as a failed command. Failure responses include exit details, stderr, and stdout; successful responses stay concise.

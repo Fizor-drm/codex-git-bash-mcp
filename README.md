@@ -7,8 +7,9 @@ A Codex plugin that runs Windows development commands through Git for Windows Ba
 ## What it provides
 
 - `git_bash_exec` MCP tool with an explicit working directory
-- Structured stdout, stderr, exit code, signal, and timeout results
-- Bounded execution time and retained output
+- Compact success output and detailed failure diagnostics without duplicated logs
+- Adaptive output limits: 32 KiB by default, or 1 MiB with `output_mode: full`
+- Bounded execution time; truncated output preserves both its beginning and end
 - A Codex skill that directs Git, search, build, test, package-manager, and POSIX commands through Git Bash
 - No runtime npm dependencies or external services
 
@@ -30,6 +31,8 @@ codex plugin add git-bash-executor@codex-git-bash-mcp
 ```
 
 Restart Codex or start a new task after installation so the skill and MCP tool are loaded.
+
+The default compact mode minimizes tokens during normal work. The bundled skill requests full output only when truncation or missing context blocks diagnosis.
 
 ## Security
 
