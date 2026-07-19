@@ -1,0 +1,25 @@
+{
+  "name": "git-bash-executor",
+  "version": "0.1.0",
+  "description": "Run Codex development commands through Git Bash on Windows.",
+  "author": {
+    "name": "Git Bash Executor contributors"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Git Bash Executor",
+    "shortDescription": "Run Windows development commands in Git Bash.",
+    "longDescription": "Adds a local MCP tool that executes Git, build, test, and search commands through Git for Windows Bash with explicit working directories, timeouts, bounded output, and structured results.",
+    "developerName": "Git Bash Executor contributors",
+    "category": "Productivity",
+    "capabilities": [
+      "Execute",
+      "Git Bash"
+    ],
+    "defaultPrompt": [
+      "Run the project checks using Git Bash.",
+      "Use Git Bash for all development commands in this task."
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}
